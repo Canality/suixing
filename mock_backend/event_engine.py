@@ -20,6 +20,8 @@ from mock_backend.mock_data import (
     RESTAURANTS, WEATHER_CONDITIONS, BIKE_STATIONS, ACTIVITIES,
 )
 from mock_backend.life_events import tick_life_events
+from mock_backend.mega_events import tick_mega_events
+from mock_backend.story_chains import process_chains, schedule_chain
 
 _events_log: list = []  # 最近的事件记录(最多50条)
 _lock = threading.Lock()
@@ -209,14 +211,35 @@ def tick_venues():
             _add_event("venue_recovered", name, f"✅ {name}已恢复正常")
 
 
-def run_all_ticks():
+def run_all_ticks(user_profile: dict = None):
     """执行一轮完整tick。"""
     tick_restaurants()
     tick_activities()
     tick_bikes()
     tick_venues()
-    # 生活事件: 15%概率触发
-    tick_life_events(_add_event)
+    # 大型城市事件: 10%概率触发, 已经激活的推进连锁
+    tick_mega_events(_add_event)
+    # 剧情链: 处理到期的步骤
+    process_chains(_add_event)
+    # 生活事件: 45%概率 + 隐藏彩蛋检测
+    life_results = tick_life_events(_add_event, user_profile)
+
+    # 剧情链触发: 当特定事件发生时, 随机启动相关剧情
+    for evt in life_results:
+        _maybe_trigger_chain(evt.get("type", ""), _add_event)
+
+
+def _maybe_trigger_chain(event_type: str, add_cb):
+    """特定事件发生后, 有概率触发后续剧情链。"""
+    chain_triggers = {
+        "life_work_overtime": ("boss_chain", 0.5),
+        "life_flash_table": ("lost_badge", 0.3),
+        "life_social_group_ride": ("weather_trap", 0.3),
+    }
+    if event_type in chain_triggers:
+        chain_id, prob = chain_triggers[event_type]
+        if random.random() < prob:
+            schedule_chain(chain_id, add_cb)
 
 
 def get_recent_events(limit: int = 20) -> list:
@@ -244,9 +267,16 @@ def start_tick_loop(interval: float = 30.0):
         tick_count = 0
         while _tick_running:
             time.sleep(interval)
-            run_all_ticks()
+            # 尝试获取用户画像(用于隐藏彩蛋)
+            profile = None
+            try:
+                from server.memory import memory
+                profile = memory.load_profile()
+            except Exception:
+                pass
+            run_all_ticks(profile)
             tick_count += 1
-            if tick_count % 5 == 0:  # 每5 tick (~2.5分钟)更新天气, 让个人/机遇事件有空间
+            if tick_count % 5 == 0:
                 tick_weather()
 
     _tick_thread = threading.Thread(target=_loop, daemon=True)

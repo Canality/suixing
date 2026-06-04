@@ -175,11 +175,19 @@ LIFE_EVENT_POOL = [
 ]
 
 
-def tick_life_events(events_log_callback) -> list:
-    """执行一次生活事件 tick。15%概率触发一个随机事件。
+def tick_life_events(events_log_callback, user_profile: dict = None) -> list:
+    """执行一次生活事件 tick。45%概率触发随机事件, 另有隐藏彩蛋检测。
 
     events_log_callback(type, entity_id, message) — 事件记录回调。
+    user_profile — 用户画像dict, 用于隐藏彩蛋匹配。
     """
+    # ── 隐藏彩蛋检测: 基于用户画像触发惊喜事件 ──
+    if user_profile:
+        egg = _check_easter_eggs(user_profile)
+        if egg and random.random() < 0.15:  # 15%概率触发彩蛋
+            events_log_callback("easter_egg", "memory", egg["msg"])
+            return [egg]
+
     if random.random() > 0.45:
         return []
 
@@ -195,3 +203,43 @@ def tick_life_events(events_log_callback) -> list:
 def get_life_events_by_domain(domain: str) -> list:
     """按域筛选事件模板（供 LLM 按需查询）。"""
     return [e for e in LIFE_EVENT_POOL if e["domain"] == domain]
+
+
+# ── 隐藏彩蛋: 基于用户画像触发 ──────────────────────────
+
+EASTER_EGGS = [
+    {
+        "check": lambda p: len(p.get("food", {}).get("recent_visits", "").split(",")) >= 3
+                            and any(w in str(p.get("food", {}).get("cuisines_liked", "")) for w in ["川", "火锅"]),
+        "msg": "🍲 恭喜！你是后院火锅的忠实食客，今天后厨推出隐藏菜单「限量藤椒鱼火锅」，仅限老客！需10分钟内确认",
+        "rarity": "urgent",
+    },
+    {
+        "check": lambda p: any(w in str(p.get("entertainment", {}).get("sports", "")) for w in ["骑行", "骑车"])
+                            and any(w in str(p.get("entertainment", {}).get("wishlist", "")) for w in ["温榆河", "骑行"]),
+        "msg": "🚴 骑行群内部消息：温榆河上游新发现一条秘密越野路线，本周六组队探路，名额仅5人！",
+        "rarity": "rare",
+    },
+    {
+        "check": lambda p: any(w in str(p.get("entertainment", {}).get("movies", "")) for w in ["悬疑", "科幻"])
+                            and any(w in str(p.get("entertainment", {}).get("activities", "")) for w in ["电影"]),
+        "msg": "🎬 猫眼独家：《流浪地球3》导演剪辑版今晚超前点映，仅此一场，万达影城(望京店)",
+        "rarity": "urgent",
+    },
+    {
+        "check": lambda p: any(w in str(p.get("food", {}).get("budget_dinner", "")) for w in ["100", "150", "200"]),
+        "msg": "💎 美团黑珍珠餐厅周开启！望京3家高端餐厅推出¥99体验套餐(原价¥300+)，限时抢购",
+        "rarity": "rare",
+    },
+]
+
+
+def _check_easter_eggs(profile: dict) -> dict | None:
+    """检查用户画像是否满足彩蛋条件。返回匹配的彩蛋或None。"""
+    for egg in EASTER_EGGS:
+        try:
+            if egg["check"](profile):
+                return egg
+        except Exception:
+            pass
+    return None
