@@ -71,19 +71,19 @@ class RarityTracker:
         self._counts: dict[str, int] = {}
 
     def should_notify(self, event_type: str, rarity: str) -> bool:
-        if rarity == "urgent":
+        if rarity in ("urgent", "high"):
             return True
-        if rarity == "high":
-            return True
+        # 第一次出现一定放行, 之后按频次节流
+        count = self._counts.get(event_type, 0) + 1
+        self._counts[event_type] = count
+        if count == 1:
+            return True  # 首次一定通知
         if rarity == "medium":
-            self._counts[event_type] = self._counts.get(event_type, 0) + 1
-            return self._counts[event_type] % 2 == 0
+            return count % 2 == 0
         if rarity == "rare":
-            self._counts[event_type] = self._counts.get(event_type, 0) + 1
-            return self._counts[event_type] % 3 == 0
+            return count % 3 == 0
         if rarity == "common":
-            self._counts[event_type] = self._counts.get(event_type, 0) + 1
-            return self._counts[event_type] % 5 == 0
+            return count % 5 == 0
         return True
 
 
@@ -161,9 +161,10 @@ def _build_proactive_prompt(
 - 即使用户有偏好(骑行/电影)，没确认具体计划 → SILENT
 - 场馆关闭/单车骑光/天气变化 → 只在与已确认计划冲突时提醒
 
-### 机遇事件
-- urgent → NOTIFY
-- rare/common(已被系统节流) → 与用户wishlist/偏好匹配才NOTIFY，否则SILENT
+### 机遇事件 — 积极提醒
+- urgent → NOTIFY (周杰伦退票这种必须推)
+- 其他的已被系统按稀有度节流, 出现在这里的就是值得推送的 → NOTIFY
+- 除非事件明显和用户无关(如用户不吃辣但推火锅特价) → SILENT
 
 ## 上次已通知
 {last_notify if last_notify else "(无)"}
