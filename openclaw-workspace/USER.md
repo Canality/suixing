@@ -42,4 +42,5 @@
 
 ## 近期状态
 - work_busy: true
-- last_updated: 2026-06-03 15:56
+- active_plans: 本周六/日带儿子去北京欢乐谷
+- last_updated: 2026-06-04 14:30

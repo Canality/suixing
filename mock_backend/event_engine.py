@@ -193,6 +193,14 @@ def tick_venues():
             elif s["type"] in ("park", "market"):
                 s["status"] = "closed"
                 _add_event("venue_closed", name, f"🚫 {name}因天气原因临时关闭")
+                # 同步天气: 场地因天气关闭 → 天气必须一致变坏
+                w = get_weather_state()
+                bad_weather = random.choice(["小雨", "中雨", "雷阵雨"])
+                w["condition"] = bad_weather
+                w["forecast"]["afternoon"] = bad_weather
+                w["forecast"]["evening"] = bad_weather
+                _add_event("weather_changed", "weather",
+                           f"天气已变化: → {bad_weather}（{name}因此关闭）")
         # 异常 → 恢复 (8%概率)
         elif current in ("delayed", "maintenance", "closed", "depleted") and random.random() < 0.08:
             s["status"] = "open" if s["type"] != "subway" and s["type"] != "bike_service" else "normal"

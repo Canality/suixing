@@ -45,7 +45,14 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 async def index():
     try:
         with open("templates/index.html", "r", encoding="utf-8") as f:
-            return f.read()
+            content = f.read()
+        from fastapi.responses import Response
+        return Response(
+            content=content,
+            media_type="text/html",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate",
+                     "Pragma": "no-cache", "Expires": "0"},
+        )
     except FileNotFoundError:
         return HTMLResponse(
             "<h1>SuiXing Demo Server is running</h1><p>UI template not found.</p>",
