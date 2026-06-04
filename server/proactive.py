@@ -96,10 +96,11 @@ def _build_proactive_prompt(profile_text: str, recent_events: list, context: str
 class ProactiveBrain:
 
     def __init__(self):
-        self._last_event_count = 0
+        self._last_event_time = ""  # 上次处理到的最新事件时间
         self._lock = threading.Lock()
         self._notification_callback = None
         self._check_count = 0
+        self._last_notify_time = 0  # 上次通知时间，防止重复推送
 
     def set_callback(self, callback):
         self._notification_callback = callback
@@ -116,22 +117,27 @@ class ProactiveBrain:
                     print(f"[ProactiveBrain] 第{self._check_count}次检查: 无用户画像，跳过")
                 return None
 
-            # 2. 最近事件
+            # 2. 最近事件 — 检查是否有新事件(按时间而非计数)
             events = get_recent_events(limit=50)
-            new_count = len(events)
-            if new_count <= self._last_event_count and self._check_count > 1:
-                return None
-            self._last_event_count = new_count
-
-            if new_count == 0:
+            if not events:
                 return None
 
-            # 3. 最近对话上下文
+            newest_time = events[-1].get("time", "")
+            if newest_time == self._last_event_time and self._check_count > 1:
+                return None  # 没有新事件，跳过(节省API调用)
+            self._last_event_time = newest_time
+
+            # 3. 防重复: 30秒内不重复通知
+            now = time.time()
+            if now - self._last_notify_time < 30:
+                return None
+
+            # 4. 最近对话上下文
             context = _get_context()
 
-            # 4. 交给LLM判断
+            # 5. 交给LLM判断
             prompt = _build_proactive_prompt(profile, events, context)
-            print(f"[ProactiveBrain] 第{self._check_count}次检查: {new_count}条事件, profile={len(profile)}chars, context={len(context)}chars", flush=True)
+            print(f"[ProactiveBrain] 第{self._check_count}次检查: {len(events)}条事件, ctx={len(context)}chars", flush=True)
 
             result = chat(
                 system_prompt=prompt,
@@ -144,7 +150,7 @@ class ProactiveBrain:
                 return None
 
             reply = result.get("reply", "").strip()
-            print(f"[ProactiveBrain] LLM回复: {reply[:100]}", flush=True)
+            print(f"[ProactiveBrain] LLM回复({len(reply)}chars): {reply[:120]}", flush=True)
 
             if reply.upper().startswith("SILENT"):
                 return None
@@ -153,6 +159,7 @@ class ProactiveBrain:
                 idx = reply.upper().find("NOTIFY:") + 7
                 msg = reply[idx:].strip()
                 if msg:
+                    self._last_notify_time = now
                     print(f"[ProactiveBrain] 决定通知: {msg[:80]}", flush=True)
                     return msg
 

@@ -350,7 +350,7 @@ def reset_sandbox():
     events = _gre(1000)  # get all
     events.clear()
     # 也重置 brain 的事件计数器
-    brain._last_event_count = 0
+    brain._last_event_time = ""
     return {"ok": True, "message": "Sandbox events cleared"}
 
 
