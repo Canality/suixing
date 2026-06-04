@@ -386,7 +386,7 @@ function toggleSettings() {
       var rows = '';
       for (var k in _oppConfig) {
         var v = _oppConfig[k];
-        rows += '<div class="settings-row"><div><div class="sr-label">' + v.icon + ' ' + v.label + '</div></div><div class="settings-toggle' + (v.enabled ? ' on' : '') + '" onclick="toggleOpp('' + k + '',this)"></div></div>';
+        rows += '<div class="settings-row"><div><div class="sr-label">' + v.icon + ' ' + v.label + '</div></div><div class="settings-toggle' + (v.enabled ? ' on' : '') + '" onclick="toggleOpp(\x27" + k + "\x27,this)"></div></div>';
       }
       document.getElementById('settingsRows').innerHTML = rows;
       ov.classList.remove('hidden');
