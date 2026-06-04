@@ -117,6 +117,12 @@ def _get_context() -> str:
 
 # ── Prompt 构建 ──────────────────────────────────────────
 
+def _fmt_notified(msgs):
+    if not msgs:
+        return "(无)"
+    return "\n".join(f"- {m[:60]}" for m in list(msgs)[-5:])
+
+
 def _build_proactive_prompt(
     profile_text: str,
     personal_events: list,
@@ -124,6 +130,7 @@ def _build_proactive_prompt(
     opp_events: list,
     context: str,
     last_notify: str,
+    notified_msgs: set = None,
 ) -> str:
 
     def _fmt(events):
@@ -178,7 +185,10 @@ def _build_proactive_prompt(
 
 ## 上次已通知
 {last_notify if last_notify else "(无)"}
-如果话题相同 → SILENT
+
+## ⚠️ 已通知过的事件（不要再为这些事件重复通知）
+{_fmt_notified(notified_msgs) if notified_msgs else "(无)"}
+**重要: 已通知过的事件不要重复推送！除非事件状态发生了实质变化。**
 
 ## 回复格式（严格）
 - 不需要通知: SILENT
@@ -200,39 +210,11 @@ class ProactiveBrain:
         self._notification_callback = None
         self._check_count = 0
         self._last_notify_msg = ""
-        self._last_notify_topics: set = set()  # 已通知话题, 防重复
+        self._notified_msgs: set = set()  # 已通知过的事件消息文本
         self._rarity_tracker = RarityTracker()
 
     def set_callback(self, callback):
         self._notification_callback = callback
-
-    def _topic_keywords(self, msg: str) -> set:
-        """提取消息中的核心话题词（用于去重）。"""
-        keywords = {"雨", "雷阵雨", "小雨", "中雨", "暴雨", "高温", "关闭",
-                     "骑行", "骑车", "野餐", "户外", "公园", "温榆河", "奥森",
-                     "电影院", "影院", "电影", "影城", "万达", "CGV", "保利",
-                     "退票", "特价", "打折", "空桌", "排队", "火锅", "加班",
-                     "生病", "发烧", "出差", "女朋友", "父母", "妈妈", "老板"}
-        msg_words = set(msg.replace("，", " ").replace("、", " ").split())
-        return keywords & msg_words
-
-    def _is_duplicate_topic(self, msg: str) -> bool:
-        """检查是否与最近通知话题重复(≥2个关键词重叠)。"""
-        if msg == self._last_notify_msg:
-            return True
-        current = self._topic_keywords(msg)
-        if not current:
-            return False
-        overlap = len(current & self._last_notify_topics)
-        return overlap >= 2
-
-    def _add_topics(self, msg: str):
-        """记录本次通知的话题词。保留最近5条。"""
-        self._last_notify_topics |= self._topic_keywords(msg)
-        # 简单策略: 保留话题词, LLM 判断自然过期时重置
-        # 每10次check清理一次旧话题
-        if self._check_count % 10 == 0:
-            self._last_notify_topics.clear()
 
     def check(self) -> str | None:
         """执行一次主动检查。三级分类 + 频次控制。"""
@@ -243,6 +225,10 @@ class ProactiveBrain:
             profile = memory.get_summary()
             if not profile or "(尚无记录)" in profile:
                 return None
+
+            # 定期清理旧通知记录(每20次 ≈ 10分钟)
+            if self._check_count % 20 == 0 and self._check_count > 0:
+                self._notified_msgs.clear()
 
             # 2. 获取事件并按三级分类
             events = get_recent_events(limit=80)
@@ -276,7 +262,7 @@ class ProactiveBrain:
             # 4. 上下文 + LLM判断
             context = _get_context()
 
-            prompt = _build_proactive_prompt(profile, personal, env, opp, context, self._last_notify_msg)
+            prompt = _build_proactive_prompt(profile, personal, env, opp, context, self._last_notify_msg, self._notified_msgs)
             print(f"[ProactiveBrain] #{self._check_count} P:{len(personal)} E:{len(env)} O:{len(opp)} ctx:{len(context)}c", flush=True)
 
             result = chat(
@@ -298,16 +284,15 @@ class ProactiveBrain:
             if "NOTIFY:" in reply.upper():
                 idx = reply.upper().find("NOTIFY:") + 7
                 msg = reply[idx:].strip()
-                # 只取第一条(防止LLM用 | 拼接多条)
                 if " | " in msg:
                     msg = msg.split(" | ")[0].strip()
-                if msg and not self._is_duplicate_topic(msg):
+                if msg:
+                    # 记录本次触发的事件消息(用于后续去重)
+                    for e in personal + env + opp:
+                        self._notified_msgs.add(e.get("message", "")[:60])
                     self._last_notify_msg = msg
-                    self._add_topics(msg)
-                    print(f"[ProactiveBrain] → 推送", flush=True)
+                    print(f"[ProactiveBrain] → 推送 (已记录{len(self._notified_msgs)}条已通知事件)", flush=True)
                     return msg
-                else:
-                    print(f"[ProactiveBrain] → 跳过(重复话题)", flush=True)
 
             return None
 
