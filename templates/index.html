@@ -188,15 +188,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <div class="chat-header-status"><span class="dot"></span>在线 · 7x24</div>
       </div>
     </div>
-        <!-- Settings Modal -->
-    <div class="settings-overlay hidden" id="settingsOverlay" onclick="toggleSettings()">
-      <div class="settings-modal" onclick="event.stopPropagation()">
-        <h4>⚙ 机遇提醒设置</h4>
-        <div id="settingsRows"></div>
-        <button class="settings-close" onclick="toggleSettings()">关闭</button>
-      </div>
-    </div>
-
     <div class="watch-badge empty" id="watchBadge" style="display:none" onclick="toggleWatchDetail()">
       <span class="wdot"></span> <span id="watchBadgeText">无活跃监控</span>
     </div>
@@ -493,5 +484,13 @@ evt.onmessage = function(e) {
   } catch(_){}
 };
 </script>
+<!-- Settings Modal -->
+<div class="settings-overlay hidden" id="settingsOverlay" onclick="toggleSettings()">
+  <div class="settings-modal" onclick="event.stopPropagation()">
+    <h4>⚙ 机遇提醒设置</h4>
+    <div id="settingsRows"></div>
+    <button class="settings-close" onclick="toggleSettings()">关闭</button>
+  </div>
+</div>
 </body>
 </html>
