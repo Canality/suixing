@@ -129,50 +129,54 @@ def _build_proactive_prompt(
             lines.append(f"- [{t}] {e.get('message', '')}")
         return "\n".join(lines)
 
-    return f"""你是随行(SuiXing)的主动通知大脑。以下是需要你判断的事件。按分类有不同处理规则。
+    return f"""你是随行的主动通知大脑。按分类有不同处理规则。
 
 ## 用户画像
 {profile_text}
 
-## 最近对话
+## 最近对话（注意区分"LLM建议的选项"和"用户确认的计划"）
 {context or "(暂无)"}
 
-## 🔴 个人事务 (必须提醒——不分场景)
+## 🔴 个人紧急事务 (必须提醒)
 {_fmt(personal_events)}
 
-## 🟡 环境变化 (仅在影响用户具体计划时提醒)
+## 🟡 环境变化 (仅在用户已确认具体计划时才提醒)
 {_fmt(env_events)}
 
-## 🟢 机遇事件 (已按稀有度过滤，稀有事件才出现)
+## 🟢 机遇事件 (已按稀有度过滤)
 {_fmt(opp_events)}
 
-## 通知规则
+## 通知规则（严格）
 
-### 个人事务 (一律提醒)
-- 工作加班/家人生病/紧急事务 → 一定提醒用户
-- 低优先级(步数不够) → 可以说 SILENT 跳过
+### 个人事务
+- 紧急的(加班/生病/暴雨) → NOTIFY
+- 低优先级(步数/外卖) → SILENT
 
-### 环境变化 (严格相关才提醒)
-- 用户说了"去温榆河"且温榆河关闭 → 提醒
-- 用户说了"看电影"且影院关闭 → 提醒
-- 用户没明确具体地点/计划的 → SILENT
+### 环境变化 — 红线
+- **用户必须明确说了具体地点+时间才算"有计划"**
+  - "我要去温榆河" ❌ 不够具体
+  - "周六下午4点去温榆河骑行" ✅ 有具体计划
+  - LLM建议/推荐的选项 ❌ 不算计划
+  - 用户说"好无聊有什么推荐" ❌ 不算计划
+- 即使用户有偏好(骑行/电影)，没确认具体计划 → SILENT
+- 场馆关闭/单车骑光/天气变化 → 只在与已确认计划冲突时提醒
 
-### 机遇事件 (已按稀有度过滤)
-- urgent(周杰伦退票等) → 一定提醒
-- rare/已节流 → 斟酌是否与用户兴趣相关，相关就提醒
+### 机遇事件
+- urgent → NOTIFY
+- rare/common(已被系统节流) → 与用户wishlist/偏好匹配才NOTIFY，否则SILENT
 
 ## 上次已通知
 {last_notify if last_notify else "(无)"}
-如果本次事件与上次通知是同一件事 → SILENT
+如果话题相同 → SILENT
 
-## 回复格式
+## 回复格式（严格）
 - 不需要通知: SILENT
 - 需要通知: NOTIFY: <消息>
-- 多条不同事件需通知: NOTIFY: <消息1> | <消息2>
+- **一次只推一条最重要的事件**，不要拼接多条
 
-消息要求: 称呼"小明"，每条≤40字，给建议。
-当前时间: {datetime.now().strftime('%m月%d日 %H:%M')}
+消息: 称呼"小明"，≤50字，给建议。
 """
+
 
 
 # ── ProactiveBrain ────────────────────────────────────────
@@ -283,6 +287,9 @@ class ProactiveBrain:
             if "NOTIFY:" in reply.upper():
                 idx = reply.upper().find("NOTIFY:") + 7
                 msg = reply[idx:].strip()
+                # 只取第一条(防止LLM用 | 拼接多条)
+                if " | " in msg:
+                    msg = msg.split(" | ")[0].strip()
                 if msg and not self._is_duplicate_topic(msg):
                     self._last_notify_msg = msg
                     self._add_topics(msg)
