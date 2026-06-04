@@ -195,13 +195,16 @@ function addMsg(text, role) {
   hideTyping();
   const div = document.createElement('div'); div.className = 'msg ' + role;
   if (role === 'agent') {
-    // Step 0: Convert HTML <a> tags to markdown, then strip all raw HTML
-    text = text.replace(/<a\s+(?:[^>]*?\s+)?href="([^"]*)"[^>]*>([^<]*)<\/a>/gi, '[$2]($1)');
+    // Step 0: Extract URL from HTML <a> tags → "text URL", then strip all raw HTML
+    text = text.replace(/<a\s+(?:[^>]*?\s+)?href="([^"]*)"[^>]*>([^<]*)<\/a>/gi, '$2 $1');
     text = text.replace(/<[^>]*>/g, '');
     // Step 1: Strip markdown heading markers (### / ## / #)
     text = text.replace(/^#{1,3}\s+/gm, '');
     // Step 2: Strip LLM monologue lines
     text = text.replace(/^(数据有些乱码|我来生成推送消息|好的，|让我来|我先|嗯，).*$/gm, '');
+    // Step 2b: Strip leaked watchdog condition/trigger expressions
+    text = text.replace(/^.*\b(?:in|not in)\s*\([^)]+\).*$/gm, '');
+    text = text.replace(/^(?:告诉|通知|提醒)(?:用户|小明|他).*$/gm, '');
     // Step 3: Collapse blank lines left by stripping
     text = text.replace(/\n{3,}/g, '\n\n');
     text = text.replace(/^\n+/, '');
