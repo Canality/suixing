@@ -87,7 +87,7 @@ class MemoryManager:
             ("住", "residence", ["home", "work", "nearby_districts"]),
             ("行", "transport", ["commute", "mode_preference", "commute_budget_ride", "departure"]),
             ("娱", "entertainment", ["sports", "movies", "activities", "social", "wishlist"]),
-            ("近期状态", "status", ["work_busy", "last_updated"]),
+            ("近期状态", "status", ["work_busy", "active_plans", "last_updated"]),
         ]
 
         lines = ["# USER · 用户画像（动态更新 — LLM 通过 remember 工具读写）", ""]
@@ -266,6 +266,21 @@ class MemoryManager:
             return self.get_summary()
 
         return " | ".join(results)
+
+    # ── 主动计划追踪 ────────────────────────────────────────────
+
+    def get_active_plans(self) -> str:
+        """读取用户近期计划/意图，供 ProactiveBrain 判断事件相关性。"""
+        p = self.load_profile()
+        status = p.get("status", {})
+        plans = status.get("active_plans", "")
+        if plans:
+            return plans
+        # Fallback: 从 wishlist 推断
+        wishlist = p.get("entertainment", {}).get("wishlist", "")
+        if wishlist:
+            return f"用户wishlist: {wishlist}"
+        return ""
 
     def _fmt_section(self, profile: dict, section: str, field: str | None = None) -> str:
         """格式化 profile 的某个 section 为可读字符串。"""

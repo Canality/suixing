@@ -20,6 +20,7 @@ from server.session import get_or_create_session
 from server.event_bus import bus
 from server.prompts import refresh_cache
 from server.watchdog import watchdog, start_watchdog_loop
+from server.proactive import brain, start_proactive_loop
 
 # ═══════════════════════════════════════════════════════════════
 # Mock Backend (内嵌)
@@ -446,11 +447,21 @@ def _on_watch_triggered(task):
         })
 
 
+def _on_proactive_notify(message: str):
+    """ProactiveBrain 主动通知回调: 推送到SSE。"""
+    _sse_queue.put({
+        "type": "watch_triggered",
+        "timestamp": datetime.now().isoformat(),
+        "data": {"task_id": "proactive", "target_name": "环境变化", "reply": message}
+    })
+
+
 if __name__ == "__main__":
     start_tick_loop(interval=30.0)
     t = threading.Thread(target=_heartbeat_loop, daemon=True)
     t.start()
     start_watchdog_loop(interval=15.0, on_trigger=_on_watch_triggered)
+    start_proactive_loop(interval=30.0, on_notify=_on_proactive_notify)
     import sys
     banner = f"""
 ╔══════════════════════════════════════════════╗
