@@ -1,127 +1,82 @@
-# 随行 SuiXing — 基于 OpenClaw 的本地生活"全天候私人管家"
+# 随行 SuiXing — 本地生活 AI 管家
 
-> 美团AI Hackathon 2026 | OpenClaw 赛道 | 提交作品
+> 美团AI Hackathon 2026 | OpenClaw 赛道
 
-## 项目简介
+## 一句话介绍
 
-**SuiXing(随行)** 是一个基于 OpenClaw 框架的本地生活 AI 管家。用户通过手机Web UI与管家交互，Agent 7x24小时后台运行，主动感知用户需求 — 餐食时段推荐餐厅、排队快到时提醒出发、周末好天气建议户外活动。
+**不用在美团/大众点评/高德/猫眼之间来回切换。跟随行说句话，它帮你查天气、找餐厅、规划路线、推荐活动，7x24小时主动盯着变化，有情况立刻通知你。**
 
-### 核心特点
+---
 
-1. **双轨架构**: Demo Server (一键启动Web演示) + OpenClaw Workspace (证明框架兼容)
-2. **主动感知**: 心跳机制 + 餐食/天气双线程监控 → 管家式主动服务
-3. **反幻觉体系**: 来源标注 + 工具调用验证 + 动态Mock数据
-4. **三场景全链路**: 餐饮推荐+排队 → 出行规划 → 天气+活动推荐
+## 功能全景
 
-## 快速开始
+| 模块 | 能力 | 数据来源 |
+|------|------|---------|
+| 🍜 美食管家 | 搜索餐厅、取号排队、口味匹配 | [美团] [大众点评] |
+| 🚗 出行管家 | 路线规划、多方式对比、导航链接 | [高德] |
+| 🎬 娱乐管家 | 活动搜索、电影票、展览票、骑行 | [猫眼] [大麦] |
+| 🌤 天气监控 | 实时天气 + 分时段预报 | [天气网] |
+| 🔔 主动通知 | 三级事件分类 + LLM自主判断推送 | — |
+| 🧠 用户记忆 | 偏好/忌口/预算/住址持久化 | — |
 
-### 一键启动 Demo
+## 架构亮点
 
-```bash
-# 1. 安装依赖
-pip install -r requirements.txt
-
-# 2. 配置 DeepSeek API Key
-# 编辑 .env 文件: DEEPSEEK_API_KEY=sk-xxxx
-
-# 3. 启动 Demo Server
-python app.py
-
-# 4. 打开浏览器
-# http://localhost:8010 → 手机模拟器UI
-# http://localhost:8010/api/events → SSE 技术面板
-```
-
-### Demo 手机模拟器
-
-Web UI 包含:
-- 手机壳模拟界面，6个预设场景按钮
-- 实时对话 + 打字动画
-- 右侧SSE技术面板: Agent思考 → 工具调用 → 结果 → 回复
-- 一键测试: 火锅推荐/去798/周末活动/查天气
+- **7x24 后台运行**: 事件引擎每30秒更新沙盒状态，LLM 主动判断是否通知
+- **三级事件系统**: 个人事务(一律提醒) / 环境变化(仅冲突时提醒) / 机遇事件(稀有度节流+6类开关)
+- **跨域连锁沙盒**: 大型城市事件(马拉松/音乐节) + 剧情链 + 记忆彩蛋
+- **多源数据整合**: 一次对话查多个平台，标注来源
+- **反幻觉**: 工具调用验证 + 来源标注 + 禁止编造
 
 ## 项目结构
 
 ```
 meituan-travel-assistant/
-├── app.py                        # Demo Server 入口 (一键启动)
-├── server/                       # Demo Server 核心
-│   ├── config.py                 # 配置加载 + 环境变量
-│   ├── session.py                # 会话状态机 + Agent逻辑
-│   ├── llm.py                    # LLM客户端 (DeepSeek)
-│   ├── prompts.py                # Prompt模板 (从workspace加载)
-│   ├── tools.py                  # 工具执行器 (调scripts)
-│   └── event_bus.py              # SSE事件推送
-├── templates/
-│   └── index.html                # Web UI (手机模拟器 + 技术面板)
-├── openclaw-workspace/           # OpenClaw 工作区
-│   ├── SOUL.md                   # 管家人设
-│   ├── AGENTS.md                 # 行为规则+工作流
-│   ├── USER.md                   # 用户画像
-│   ├── HEARTBEAT.md              # 7x24后台任务
-│   ├── anti_hallucination_prompt.md  # 反幻觉规则
-│   ├── memory/                   # 每日记忆日志
-│   └── skills/
-│       ├── dining-advisor/       # 🍜 餐饮顾问
-│       ├── commute-planner/      # 🚗 出行管家
-│       └── leisure-scout/        # 🎬 娱乐向导
-├── mock_backend/                 # 动态模拟数据
-│   ├── mock_data.py              # 12餐厅+8活动+天气+路线+单车
-│   └── event_engine.py           # 随机事件引擎
-├── shared-scripts/               # 共享工具脚本
-│   ├── heartbeat_runner.py       # 7x24监控执行器
-│   ├── feishu_bot.py             # 飞书卡片推送
-│   └── coupons.json              # 优惠券数据
-├── tests/                        # 测试 (131项)
-│   ├── test_mock_backend.py      # Mock API 测试 (14项)
-│   ├── test_skills.py            # Skill脚本测试 (41项)
-│   └── test_e2e.py               # 端到端测试 (76项)
-├── DEMO_SCRIPT.md                # 5分钟演示脚本
-├── PROJECT_PLAN.md               # 开发计划
-└── requirements.txt
+├── app.py                  # FastAPI 入口
+├── server/                 # 核心引擎
+│   ├── session.py          # 会话管理 + ReAct循环
+│   ├── llm.py              # DeepSeek API 封装
+│   ├── prompts.py          # 三层Prompt架构
+│   ├── proactive.py        # LLM主动通知引擎(三级分类)
+│   ├── watchdog.py         # 条件监控引擎
+│   ├── memory.py           # 用户画像持久化
+│   ├── tools.py            # 工具执行器
+│   └── opportunity_config.py  # 机遇事件开关
+├── mock_backend/           # 动态沙盒
+│   ├── mock_data.py        # 33+商户数据
+│   ├── event_engine.py     # 状态变化引擎
+│   ├── mega_events.py      # 大型城市事件(马拉松等)
+│   ├── story_chains.py     # 剧情链事件
+│   └── life_events.py      # 生活事件 + 隐藏彩蛋
+├── templates/index.html    # Web UI(手机模拟器+沙盒面板+技术面板)
+├── tests/                  # 131项测试
+└── ARCHITECTURE.md         # 技术架构文档
 ```
 
-## 三个核心 Skill
+## 快速开始
 
-| Skill | 功能 | 工具 |
-|-------|------|------|
-| **dining-advisor** | 餐厅搜索、排队取号、排队监控 | search_restaurants, check_queue |
-| **commute-planner** | 路径规划、打车预估、单车推荐 | plan_route |
-| **leisure-scout** | 天气查询、活动推荐、电影演出 | get_weather, search_activities |
+```bash
+pip install -r requirements.txt
+cp .env.example .env   # 编辑填入 DEEPSEEK_API_KEY
+python app.py          # → http://localhost:8010
+```
 
-## 7x24 后台心跳
+## 文档索引
 
-1. **餐食监控**: 7:00/11:30/17:30/21:00 触发 → SSE推送提醒
-2. **天气监控**: 每天检查 → 周末好天气推荐户外活动
-3. **动态事件**: 每30秒更新餐厅排队/活动状态/单车数量
+| 文档 | 内容 |
+|------|------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | 系统架构、数据流、设计决策 |
+| [SANDBOX.md](SANDBOX.md) | 沙盒事件系统设计(三级分类+连锁+彩蛋) |
+| [DEPLOY.md](DEPLOY.md) | 部署指南(Render/Railway) |
+| [DEMO_SCRIPT.md](DEMO_SCRIPT.md) | 演示脚本 |
 
 ## 测试
 
 ```bash
-# Mock API 测试 (需先启动server)
-python tests/test_mock_backend.py
-
-# Skill脚本测试
-python tests/test_skills.py
-
-# 端到端测试
-python tests/test_e2e.py
-
-# 全量: 14 + 41 + 76 = 131 tests
+python tests/test_mock_backend.py  # 14 项
+python tests/test_skills.py        # 41 项 (需server运行)
+python tests/test_e2e.py           # 76 项 (需server运行)
 ```
 
-## OpenClaw 兼容
+---
 
-`openclaw-workspace/` 目录可直接用于 OpenClaw Gateway:
-
-```bash
-cp -r openclaw-workspace/* ~/.openclaw/workspace/
-openclaw gateway --port 18789
-```
-
-## 提交信息
-
-- **赛道**: 命题赛道 1 — 基于OpenClaw的本地生活"全天候私人管家"
-- **作品名称**: 随行 SuiXing
-- **版本**: v2.0.0
-- **提交截止**: 2026-06-07
+*SuiXing v2.0 — Built for 美团 AI Hackathon 2026*
