@@ -41,9 +41,6 @@ EVENT_CATEGORIES: dict[str, tuple[str, str]] = {
     "mega_start":              ("environmental", ""),
     "mega_chain":              ("environmental", ""),
     "mega_end":                ("environmental", ""),
-    # 剧情链
-    "story_chain_start":       ("personal", "high"),
-    "story_chain_step":        ("personal", "high"),
     # 隐藏彩蛋
     "easter_egg":              ("opportunity", "urgent"),
 

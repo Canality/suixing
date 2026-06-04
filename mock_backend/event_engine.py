@@ -21,7 +21,6 @@ from mock_backend.mock_data import (
 )
 from mock_backend.life_events import tick_life_events
 from mock_backend.mega_events import tick_mega_events
-from mock_backend.story_chains import process_chains, schedule_chain
 
 _events_log: list = []  # 最近的事件记录(最多50条)
 _lock = threading.Lock()
@@ -219,27 +218,8 @@ def run_all_ticks(user_profile: dict = None):
     tick_venues()
     # 大型城市事件: 10%概率触发, 已经激活的推进连锁
     tick_mega_events(_add_event)
-    # 剧情链: 处理到期的步骤
-    process_chains(_add_event)
     # 生活事件: 45%概率 + 隐藏彩蛋检测
-    life_results = tick_life_events(_add_event, user_profile)
-
-    # 剧情链触发: 当特定事件发生时, 随机启动相关剧情
-    for evt in life_results:
-        _maybe_trigger_chain(evt.get("type", ""), _add_event)
-
-
-def _maybe_trigger_chain(event_type: str, add_cb):
-    """特定事件发生后, 有概率触发后续剧情链。"""
-    chain_triggers = {
-        "life_work_overtime": ("boss_chain", 0.5),
-        "life_flash_table": ("lost_badge", 0.3),
-        "life_social_group_ride": ("weather_trap", 0.3),
-    }
-    if event_type in chain_triggers:
-        chain_id, prob = chain_triggers[event_type]
-        if random.random() < prob:
-            schedule_chain(chain_id, add_cb)
+    tick_life_events(_add_event, user_profile)
 
 
 def get_recent_events(limit: int = 20) -> list:

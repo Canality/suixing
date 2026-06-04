@@ -84,7 +84,7 @@ doc.add_paragraph()
 info_items = [
     ('版本', 'v2.0'),
     ('日期', datetime.now().strftime('%Y-%m-%d')),
-    ('作者', '冯岩'),
+    ('作者', 'Canaan'),
     ('赛道', '美团AI Hackathon 2026 · OpenClaw'),
     ('状态', '已实现（Demo 可运行）'),
 ]
