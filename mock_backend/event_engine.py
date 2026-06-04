@@ -219,7 +219,13 @@ def run_all_ticks():
 
 def get_recent_events(limit: int = 20) -> list:
     with _lock:
-        return _events_log[-limit:]
+        return list(_events_log[-limit:])
+
+
+def clear_events():
+    """清空事件日志（页面刷新时调用）。"""
+    with _lock:
+        _events_log.clear()
 
 
 # 后台tick线程

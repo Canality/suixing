@@ -37,7 +37,7 @@ def _get_context() -> str:
 
 # ── Prompt 构建 ──────────────────────────────────────────
 
-def _build_proactive_prompt(profile_text: str, recent_events: list, context: str) -> str:
+def _build_proactive_prompt(profile_text: str, recent_events: list, context: str, last_notify: str = "") -> str:
     events_text = ""
     for e in recent_events[-12:]:
         t = e.get("time", "")
@@ -68,6 +68,11 @@ def _build_proactive_prompt(profile_text: str, recent_events: list, context: str
 
 ## 最新环境事件
 {events_text}
+
+## 上次已通知用户
+{last_notify if last_notify else "(从未通知过)"}
+
+**如果最新事件与上次通知是同类型同原因，不要重复通知——回复 SILENT。**
 
 ## 判断标准
 满足以下任一条件就通知:
@@ -100,7 +105,7 @@ class ProactiveBrain:
         self._lock = threading.Lock()
         self._notification_callback = None
         self._check_count = 0
-        self._last_notify_time = 0  # 上次通知时间，防止重复推送
+        self._last_notify_msg = ""  # 上次通知内容，防止重复推送同类消息
 
     def set_callback(self, callback):
         self._notification_callback = callback
@@ -127,16 +132,14 @@ class ProactiveBrain:
                 return None  # 没有新事件，跳过(节省API调用)
             self._last_event_time = newest_time
 
-            # 3. 防重复: 30秒内不重复通知
-            now = time.time()
-            if now - self._last_notify_time < 30:
-                return None
+            # 3. 防重复: 如果上次已通知过，告诉LLM避免重复
+            last_notify = self._last_notify_msg
 
             # 4. 最近对话上下文
             context = _get_context()
 
             # 5. 交给LLM判断
-            prompt = _build_proactive_prompt(profile, events, context)
+            prompt = _build_proactive_prompt(profile, events, context, last_notify)
             print(f"[ProactiveBrain] 第{self._check_count}次检查: {len(events)}条事件, ctx={len(context)}chars", flush=True)
 
             result = chat(
@@ -159,7 +162,7 @@ class ProactiveBrain:
                 idx = reply.upper().find("NOTIFY:") + 7
                 msg = reply[idx:].strip()
                 if msg:
-                    self._last_notify_time = now
+                    self._last_notify_msg = msg
                     print(f"[ProactiveBrain] 决定通知: {msg[:80]}", flush=True)
                     return msg
 

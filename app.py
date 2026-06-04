@@ -345,12 +345,11 @@ def sandbox_events(limit: int = 8):
 
 @app.get("/api/sandbox/reset")
 def reset_sandbox():
-    """清空沙盒事件日志 + 重置天气状态。"""
-    from mock_backend.event_engine import get_recent_events as _gre
-    events = _gre(1000)  # get all
-    events.clear()
-    # 也重置 brain 的事件计数器
+    """清空沙盒事件日志。"""
+    from mock_backend.event_engine import clear_events
+    clear_events()
     brain._last_event_time = ""
+    brain._last_notify_msg = ""
     return {"ok": True, "message": "Sandbox events cleared"}
 
 
