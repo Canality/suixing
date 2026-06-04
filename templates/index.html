@@ -382,31 +382,39 @@ function toggleSettings() {
   var ov = document.getElementById('settingsOverlay');
   if (ov.classList.contains('hidden')) {
     fetch('/api/opportunity/config').then(function(r){return r.json()}).then(function(d){
-      _oppConfig = d.categories || {};
-      var rows = '';
-      for (var k in _oppConfig) {
-        var v = _oppConfig[k];
-        rows += '<div class="settings-row"><div><div class="sr-label">' + v.icon + ' ' + v.label + '</div></div><div class="settings-toggle' + (v.enabled ? ' on' : '') + '" onclick="toggleOpp(\x27" + k + "\x27,this)"></div></div>';
+      var container = document.getElementById('settingsRows');
+      container.innerHTML = '';
+      var cats = d.categories || {};
+      for (var k in cats) {
+        var v = cats[k];
+        var row = document.createElement('div');
+        row.className = 'settings-row';
+        var label = document.createElement('div');
+        label.innerHTML = '<div class="sr-label">' + v.icon + ' ' + v.label + '</div>';
+        var tog = document.createElement('div');
+        tog.className = 'settings-toggle' + (v.enabled ? ' on' : '');
+        tog.setAttribute('data-subcat', k);
+        tog.onclick = function(){
+          var subcat = this.getAttribute('data-subcat');
+          var on = !this.classList.contains('on');
+          var self = this;
+          fetch('/api/opportunity/toggle', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({category:subcat, enabled:on})
+          }).then(function(r){return r.json()}).then(function(d){
+            if (d.ok) { if (on) self.classList.add('on'); else self.classList.remove('on'); }
+          });
+        };
+        row.appendChild(label);
+        row.appendChild(tog);
+        container.appendChild(row);
       }
-      document.getElementById('settingsRows').innerHTML = rows;
       ov.classList.remove('hidden');
-    });
+    }).catch(function(){});
   } else {
     ov.classList.add('hidden');
   }
-}
-
-function toggleOpp(subcat, el) {
-  var enabled = !el.classList.contains('on');
-  fetch('/api/opportunity/toggle', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({category: subcat, enabled: enabled})
-  }).then(function(r){return r.json()}).then(function(d){
-    if (d.ok) {
-      if (enabled) el.classList.add('on'); else el.classList.remove('on');
-    }
-  });
 }
 
 function toggleSandbox() {
