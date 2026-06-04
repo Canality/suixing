@@ -230,31 +230,21 @@ function addMsg(text, role) {
   hideTyping();
   const div = document.createElement('div'); div.className = 'msg ' + role;
   if (role === 'agent') {
-    // Debug: log raw text to console (check if <a> tags present)
-    console.log('[addMsg RAW]', text.substring(0, 300));
-
-    // Step 0: Extract URL from HTML <a> tags → "text URL", then strip all raw HTML
-    text = text.replace(/<a\s+(?:[^>]*?\s+)?href="([^"]*)"[^>]*>([^<]*)<\/a>/gi, '$2 $1');
-    text = text.replace(/<[^>]*>/g, '');
-    // Step 0b: Strip orphaned HTML attributes (belt-and-suspenders)
-    text = text.replace(/"\s+(?:target|style|class|rel|onclick)="[^"]*"/gi, '');
-    text = text.replace(/"\s*>/g, '');
-    console.log('[addMsg CLEAN]', text.substring(0, 300));
-    // Step 1: Strip markdown heading markers (### / ## / #)
+    // Strip markdown heading markers (### / ## / #)
     text = text.replace(/^#{1,3}\s+/gm, '');
-    // Step 2: Strip LLM monologue lines
+    // Strip LLM monologue lines
     text = text.replace(/^(数据有些乱码|我来生成推送消息|好的，|让我来|我先|嗯，).*$/gm, '');
-    // Step 2b: Strip leaked watchdog condition/trigger expressions
+    // Strip leaked watchdog condition/trigger expressions
     text = text.replace(/^.*\b(?:in|not in)\s*\([^)]+\).*$/gm, '');
     text = text.replace(/^(?:告诉|通知|提醒)(?:用户|小明|他).*$/gm, '');
-    // Step 3: Collapse blank lines left by stripping
+    // Collapse blank lines left by stripping
     text = text.replace(/\n{3,}/g, '\n\n');
     text = text.replace(/^\n+/, '');
-    // Step 4: Format markdown links: [text](url) → <a>
-    text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" style="color:#6366f1">$1</a>');
-    // Format bare URLs → clickable links
-    text = text.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" style="color:#6366f1">$1</a>');
-    // Format sources
+    // Strip any HTML tags (defense in depth)
+    text = text.replace(/<[^>]*>/g, '');
+    // Bare URLs → clickable links (only link handling we need)
+    text = text.replace(/(https?:\/\/[^\s<>]+)/g, '<a href="$1" target="_blank" style="color:#6366f1">$1</a>');
+    // Format sources: [高德] [美团] etc
     text = text.replace(/\[([^\]]+)\]/g, '<span class="src-tag">[$1]</span>');
     // Format bold
     text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
