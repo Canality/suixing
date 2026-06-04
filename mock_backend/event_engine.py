@@ -244,7 +244,7 @@ def start_tick_loop(interval: float = 30.0):
             time.sleep(interval)
             run_all_ticks()
             tick_count += 1
-            if tick_count % 2 == 0:  # 每2 tick (~1分钟)更新天气, Demo高速
+            if tick_count % 5 == 0:  # 每5 tick (~2.5分钟)更新天气, 让个人/机遇事件有空间
                 tick_weather()
 
     _tick_thread = threading.Thread(target=_loop, daemon=True)

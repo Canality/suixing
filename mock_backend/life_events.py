@@ -180,7 +180,7 @@ def tick_life_events(events_log_callback) -> list:
 
     events_log_callback(type, entity_id, message) — 事件记录回调。
     """
-    if random.random() > 0.25:
+    if random.random() > 0.45:
         return []
 
     event = random.choice(LIFE_EVENT_POOL)
