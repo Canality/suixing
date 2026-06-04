@@ -230,9 +230,16 @@ function addMsg(text, role) {
   hideTyping();
   const div = document.createElement('div'); div.className = 'msg ' + role;
   if (role === 'agent') {
+    // Debug: log raw text to console (check if <a> tags present)
+    console.log('[addMsg RAW]', text.substring(0, 300));
+
     // Step 0: Extract URL from HTML <a> tags → "text URL", then strip all raw HTML
     text = text.replace(/<a\s+(?:[^>]*?\s+)?href="([^"]*)"[^>]*>([^<]*)<\/a>/gi, '$2 $1');
     text = text.replace(/<[^>]*>/g, '');
+    // Step 0b: Strip orphaned HTML attributes (belt-and-suspenders)
+    text = text.replace(/"\s+(?:target|style|class|rel|onclick)="[^"]*"/gi, '');
+    text = text.replace(/"\s*>/g, '');
+    console.log('[addMsg CLEAN]', text.substring(0, 300));
     // Step 1: Strip markdown heading markers (### / ## / #)
     text = text.replace(/^#{1,3}\s+/gm, '');
     // Step 2: Strip LLM monologue lines
@@ -397,6 +404,9 @@ function refreshSandbox() {
 // Initial fetch + auto-refresh every 5 seconds
 refreshSandbox();
 setInterval(refreshSandbox, 5000);
+
+// Page refresh → clear sandbox events server-side
+fetch('/api/sandbox/reset');
 
 // SSE tech panel
 const evt = new EventSource('/api/events');
