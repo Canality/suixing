@@ -283,6 +283,12 @@ def init_weather_state():
             "tomorrow_morning": random.choice(WEATHER_CONDITIONS),  # 次日06:00-12:00
             "tomorrow_afternoon": random.choice(WEATHER_CONDITIONS),
             "tomorrow_evening": random.choice(WEATHER_CONDITIONS),
+            "saturday_morning": random.choice(WEATHER_CONDITIONS),  # 周六上午
+            "saturday_afternoon": random.choice(WEATHER_CONDITIONS),
+            "saturday_evening": random.choice(WEATHER_CONDITIONS),
+            "sunday_morning": random.choice(WEATHER_CONDITIONS),    # 周日上午
+            "sunday_afternoon": random.choice(WEATHER_CONDITIONS),
+            "sunday_evening": random.choice(WEATHER_CONDITIONS),
         },
         "humidity": random.randint(30, 80),
         "wind": f"{random.choice(['东北','东南','西北','西南'])}风{random.randint(2,5)}级",

@@ -106,12 +106,29 @@ class Watchdog:
         return self._check_condition({"hour": now.hour, "minute": now.minute}, task.condition)
 
     def _check_condition(self, data: dict, condition: str) -> bool:
-        """安全评估LLM定义的简单条件表达式。
+        """评估LLM定义的条件表达式，支持 and/or 复合条件。
 
-        支持: field(.subfield)* op value
+        原子条件: field(.subfield)* op value
           例: queue_length <= 5, forecast.evening in ('雨','雷阵雨')
           op ∈ {<=, >=, ==, !=, <, >, in, not in}
+        复合条件: A or B or C, A and B and C
         """
+        condition = condition.strip()
+
+        # 处理 ' or ' (任一满足即触发)
+        if ' or ' in condition:
+            parts = condition.split(' or ')
+            return any(self._eval_atom(data, p.strip()) for p in parts)
+
+        # 处理 ' and ' (全部满足才触发)
+        if ' and ' in condition:
+            parts = condition.split(' and ')
+            return all(self._eval_atom(data, p.strip()) for p in parts)
+
+        return self._eval_atom(data, condition)
+
+    def _eval_atom(self, data: dict, condition: str) -> bool:
+        """评估单个原子条件。"""
         pattern = r"^([\w.]+)\s*(<=|>=|==|!=|<|>|not in|in)\s*(.+)$"
         m = re.match(pattern, condition.strip())
         if not m:
