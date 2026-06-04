@@ -1,9 +1,12 @@
-"""LLM驱动的主动通知引擎 — 理解用户意图+痛点，自主判断是否推送。
+"""LLM驱动的主动通知引擎 — 三级事件分类 + 智能推送。
 
-每 N 秒:
-1. 读取用户画像 + 最近对话摘要 + 沙盒事件
-2. 交给 LLM 自主判断: "事件是否触及用户痛点/影响用户计划?"
-3. 如果 LLM 认为值得通知 → 生成推送消息 → 通过 SSE 推送到前端
+事件分类:
+  1. 个人事务 (personal)  — 老板加班/女友生病/父母想念 → 一律提醒
+  2. 环境变化 (environmental) — 天气/场馆/单车 → 只在与用户计划冲突时提醒
+  3. 机遇事件 (opportunity) — 退票/特价/空桌 → 按稀有度节流推送
+
+RarityTracker: 机遇事件频次控制
+  urgent → 每次都推   rare → 每3次推1次   common → 每5次推1次
 """
 
 import json
@@ -16,18 +19,85 @@ from server.memory import memory
 from mock_backend.event_engine import get_recent_events
 
 
-# ── 轻量会话上下文（供 ProactiveBrain 读取） ──────────────
+# ── 事件分类表 ──────────────────────────────────────────
+
+EVENT_CATEGORIES: dict[str, tuple[str, str]] = {
+    # === 个人事务 (personal, rarity) ===
+    "life_work_deadline":      ("personal", "urgent"),
+    "life_work_overtime":      ("personal", "urgent"),
+    "life_work_meeting":       ("personal", "high"),
+    "life_social_birthday":    ("personal", "urgent"),
+    "life_social_invite":      ("personal", "high"),
+    "life_girlfriend_sick":    ("personal", "urgent"),
+    "life_parents_miss":       ("personal", "urgent"),
+    "life_boss_trip":          ("personal", "urgent"),
+    "life_health_steps":       ("personal", "low"),
+    "life_health_takeout":     ("personal", "low"),
+    "life_budget_warning":     ("personal", "medium"),
+    "life_rain_surge":         ("personal", "urgent"),
+    "life_heat_wave":          ("personal", "urgent"),
+
+    # === 环境变化 (environmental, _) ===
+    "weather_changed":         ("environmental", ""),
+    "forecast_change":         ("environmental", ""),
+    "venue_closed":            ("environmental", ""),
+    "venue_disrupted":         ("environmental", ""),
+    "venue_recovered":         ("environmental", ""),
+    "restaurant_closed":       ("environmental", ""),
+    "temporary_closed":        ("environmental", ""),
+    "restaurant_full":         ("environmental", ""),
+    "bikes_empty":             ("environmental", ""),
+
+    # === 机遇事件 (opportunity, rarity) ===
+    "life_flash_table":        ("opportunity", "urgent"),
+    "life_flash_discount":     ("opportunity", "rare"),
+    "life_ticket_released_vip":("opportunity", "urgent"),
+    "life_last_chance":        ("opportunity", "rare"),
+    "life_coupon_expiring":    ("opportunity", "common"),
+    "life_member_expiring":    ("opportunity", "common"),
+    "life_social_group_ride":  ("opportunity", "rare"),
+    "ticket_released":         ("opportunity", "rare"),
+    "table_opened":            ("opportunity", "common"),
+    "daily_special":           ("opportunity", "common"),
+    "restaurant_reopened":     ("opportunity", "rare"),
+    "ticket_available":        ("opportunity", "urgent"),
+}
+
+
+class RarityTracker:
+    """机遇事件频次控制: urgent=每次, rare=每3次, common=每5次."""
+
+    def __init__(self):
+        self._counts: dict[str, int] = {}
+
+    def should_notify(self, event_type: str, rarity: str) -> bool:
+        if rarity == "urgent":
+            return True
+        if rarity == "high":
+            return True
+        if rarity == "medium":
+            self._counts[event_type] = self._counts.get(event_type, 0) + 1
+            return self._counts[event_type] % 2 == 0
+        if rarity == "rare":
+            self._counts[event_type] = self._counts.get(event_type, 0) + 1
+            return self._counts[event_type] % 3 == 0
+        if rarity == "common":
+            self._counts[event_type] = self._counts.get(event_type, 0) + 1
+            return self._counts[event_type] % 5 == 0
+        return True
+
+
+# ── 轻量会话上下文 ──────────────────────────────────────
 
 _last_context: str = ""
 _context_lock = threading.Lock()
 
 
 def update_context(user_msg: str, reply_summary: str):
-    """Session 每轮对话后调用，更新上下文供 ProactiveBrain 使用。"""
     global _last_context
     with _context_lock:
         t = datetime.now().strftime("%H:%M")
-        _last_context = f"[{t}] 用户说: {user_msg[:120]}\n[{t}] 助手回复: {reply_summary[:120]}"
+        _last_context = f"[{t}] 用户: {user_msg[:120]}\n[{t}] 助手: {reply_summary[:120]}"
 
 
 def _get_context() -> str:
@@ -37,64 +107,71 @@ def _get_context() -> str:
 
 # ── Prompt 构建 ──────────────────────────────────────────
 
-def _build_proactive_prompt(profile_text: str, recent_events: list, context: str, last_notify: str = "") -> str:
-    events_text = ""
-    for e in recent_events[-12:]:
-        t = e.get("time", "")
-        if isinstance(t, str) and len(t) >= 16:
-            t = t[11:16]
-        else:
-            t = ""
-        events_text += f"- [{t}] {e.get('message', '')}\n"
+def _build_proactive_prompt(
+    profile_text: str,
+    personal_events: list,
+    env_events: list,
+    opp_events: list,
+    context: str,
+    last_notify: str,
+) -> str:
 
-    if not events_text:
-        events_text = "(暂无新事件)"
+    def _fmt(events):
+        if not events:
+            return "(无)"
+        lines = []
+        for e in events[-6:]:
+            t = e.get("time", "")
+            if isinstance(t, str) and len(t) >= 16:
+                t = t[11:16]
+            else:
+                t = ""
+            lines.append(f"- [{t}] {e.get('message', '')}")
+        return "\n".join(lines)
 
-    # 从画像中提取户外相关偏好
-    outdoor_hint = ""
-    if any(w in profile_text for w in ["骑行", "跑步", "户外", "公园", "野餐", "骑车"]):
-        outdoor_hint = "\n**用户有户外活动偏好，天气变化(雨/高温/空气质量差)必须通知！**"
-    if "怕热" in profile_text:
-        outdoor_hint += "\n**用户怕热，温度>32°C必须通知！**"
-
-    return f"""你是随行(SuiXing)的主动通知大脑。检查环境变化，判断是否主动推送消息。
+    return f"""你是随行(SuiXing)的主动通知大脑。以下是需要你判断的事件。按分类有不同处理规则。
 
 ## 用户画像
 {profile_text}
-{outdoor_hint}
 
 ## 最近对话
-{context or "(暂无对话)"}
+{context or "(暂无)"}
 
-## 最新环境事件
-{events_text}
+## 🔴 个人事务 (必须提醒——不分场景)
+{_fmt(personal_events)}
 
-## 上次已通知用户
-{last_notify if last_notify else "(从未通知过)"}
+## 🟡 环境变化 (仅在影响用户具体计划时提醒)
+{_fmt(env_events)}
 
-**如果最新事件与上次通知是同类型同原因，不要重复通知——回复 SILENT。**
+## 🟢 机遇事件 (已按稀有度过滤，稀有事件才出现)
+{_fmt(opp_events)}
 
-## 判断标准（严格——只在必要时通知）
-必须同时满足以下条件才通知:
-1. 事件与用户最近对话中明确提到的具体计划直接冲突
-   - 用户说了"去温榆河" → 温榆河关闭才通知
-   - 用户说了"看电影" → 影院关闭才通知
-   - 用户只是有骑行偏好但没具体计划 → 不通知
-2. 事件有紧迫性，用户需要立即调整计划
+## 通知规则
 
-绝不通告的情况:
-- 用户没有明确计划，只是有偏好 → SILENT
-- 事件与用户计划无关（用户说骑行但事件是电影院关闭） → SILENT
-- 与上次通知内容相同 → SILENT
+### 个人事务 (一律提醒)
+- 工作加班/家人生病/紧急事务 → 一定提醒用户
+- 低优先级(步数不够) → 可以说 SILENT 跳过
 
-## 回复格式（严格）
-- 不需要通知: 只回复 `SILENT`
-- 需要通知: 回复 `NOTIFY: <推送消息>`
+### 环境变化 (严格相关才提醒)
+- 用户说了"去温榆河"且温榆河关闭 → 提醒
+- 用户说了"看电影"且影院关闭 → 提醒
+- 用户没明确具体地点/计划的 → SILENT
 
-推送消息格式: "小明，<发生什么>，<建议>"
-消息不超过80字，emoji最多1个。
+### 机遇事件 (已按稀有度过滤)
+- urgent(周杰伦退票等) → 一定提醒
+- rare/已节流 → 斟酌是否与用户兴趣相关，相关就提醒
 
-当前时间: {datetime.now().strftime('%Y-%m-%d %H:%M')} (北京时区)
+## 上次已通知
+{last_notify if last_notify else "(无)"}
+如果本次事件与上次通知是同一件事 → SILENT
+
+## 回复格式
+- 不需要通知: SILENT
+- 需要通知: NOTIFY: <消息>
+- 多条不同事件需通知: NOTIFY: <消息1> | <消息2>
+
+消息要求: 称呼"小明"，每条≤40字，给建议。
+当前时间: {datetime.now().strftime('%m月%d日 %H:%M')}
 """
 
 
@@ -103,59 +180,73 @@ def _build_proactive_prompt(profile_text: str, recent_events: list, context: str
 class ProactiveBrain:
 
     def __init__(self):
-        self._last_event_time = ""  # 上次处理到的最新事件时间
+        self._last_event_time = ""
         self._lock = threading.Lock()
         self._notification_callback = None
         self._check_count = 0
-        self._last_notify_msg = ""  # 上次通知内容，防止重复推送同类消息
+        self._last_notify_msg = ""
+        self._rarity_tracker = RarityTracker()
 
     def set_callback(self, callback):
         self._notification_callback = callback
 
     def check(self) -> str | None:
-        """执行一次主动检查。返回推送消息或 None。"""
+        """执行一次主动检查。三级分类 + 频次控制。"""
         try:
             self._check_count += 1
 
             # 1. 用户画像
             profile = memory.get_summary()
             if not profile or "(尚无记录)" in profile:
-                if self._check_count <= 3:
-                    print(f"[ProactiveBrain] 第{self._check_count}次检查: 无用户画像，跳过")
                 return None
 
-            # 2. 最近事件 — 检查是否有新事件(按时间而非计数)
-            events = get_recent_events(limit=50)
+            # 2. 获取事件并按三级分类
+            events = get_recent_events(limit=80)
             if not events:
                 return None
 
             newest_time = events[-1].get("time", "")
             if newest_time == self._last_event_time and self._check_count > 1:
-                return None  # 没有新事件，跳过(节省API调用)
+                return None
             self._last_event_time = newest_time
 
-            # 3. 防重复: 如果上次已通知过，告诉LLM避免重复
-            last_notify = self._last_notify_msg
+            personal, env, opp = [], [], []
+            for e in events:
+                cat, rarity = EVENT_CATEGORIES.get(e.get("type", ""), ("environmental", ""))
+                if cat == "personal":
+                    personal.append(e)
+                elif cat == "opportunity":
+                    if self._rarity_tracker.should_notify(e["type"], rarity):
+                        opp.append(e)
+                else:
+                    env.append(e)
 
-            # 4. 最近对话上下文
+            # 3. 如果没有个人事务也没有需评估的事件，跳过
+            has_urgent_personal = any(
+                EVENT_CATEGORIES.get(e["type"], ("", ""))[1] in ("urgent", "high")
+                for e in personal
+            )
+            if not personal and not env and not opp:
+                return None
+
+            # 4. 上下文 + LLM判断
             context = _get_context()
 
-            # 5. 交给LLM判断
-            prompt = _build_proactive_prompt(profile, events, context, last_notify)
-            print(f"[ProactiveBrain] 第{self._check_count}次检查: {len(events)}条事件, ctx={len(context)}chars", flush=True)
+            prompt = _build_proactive_prompt(profile, personal, env, opp, context, self._last_notify_msg)
+            print(f"[ProactiveBrain] #{self._check_count} P:{len(personal)} E:{len(env)} O:{len(opp)} ctx:{len(context)}c", flush=True)
 
             result = chat(
                 system_prompt=prompt,
-                user_message="请检查以上事件，判断是否需要通知用户。",
+                user_message="请判断以上事件是否需要通知用户。",
                 history=[],
             )
 
             if not result.get("ok"):
-                print(f"[ProactiveBrain] LLM调用失败: {result.get('error', '')}", flush=True)
+                print(f"[ProactiveBrain] LLM error: {result.get('error','')}", flush=True)
                 return None
 
             reply = result.get("reply", "").strip()
-            print(f"[ProactiveBrain] LLM回复({len(reply)}chars): {reply[:120]}", flush=True)
+            print(f"[ProactiveBrain] LLM({len(reply)}c): {reply[:150]}", flush=True)
 
             if reply.upper().startswith("SILENT"):
                 return None
@@ -163,9 +254,9 @@ class ProactiveBrain:
             if "NOTIFY:" in reply.upper():
                 idx = reply.upper().find("NOTIFY:") + 7
                 msg = reply[idx:].strip()
-                if msg:
+                if msg and msg != self._last_notify_msg:
                     self._last_notify_msg = msg
-                    print(f"[ProactiveBrain] 决定通知: {msg[:80]}", flush=True)
+                    print(f"[ProactiveBrain] → 推送", flush=True)
                     return msg
 
             return None
@@ -186,17 +277,16 @@ def start_proactive_loop(interval: float = 30.0, on_notify=None):
     brain.set_callback(on_notify)
 
     def loop():
-        time.sleep(10)  # 首次等10秒让系统初始化
-        print("[ProactiveBrain] 主动通知循环已启动", flush=True)
+        time.sleep(10)
+        print("[ProactiveBrain] 三级分类通知引擎已启动", flush=True)
         while True:
             time.sleep(interval)
             try:
                 msg = brain.check()
                 if msg and on_notify:
-                    print(f"[ProactiveBrain] 推送通知到SSE", flush=True)
                     on_notify(msg)
             except Exception as e:
-                print(f"[ProactiveBrain] 循环异常: {e}", flush=True)
+                print(f"[ProactiveBrain] loop err: {e}", flush=True)
 
     t = threading.Thread(target=loop, daemon=True)
     t.start()

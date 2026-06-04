@@ -134,6 +134,29 @@ LIFE_EVENT_POOL = [
         "hook": "用户喜欢科幻 → 火爆场次有退票 → 要不要锁定？",
     },
 
+    # ═══ 紧急个人事务 ═══
+    {
+        "type": "girlfriend_sick",
+        "msg": "女朋友发消息说不舒服，好像发烧了",
+        "urgency": "high",
+        "domain": "general",
+        "hook": "紧急 → 取消计划 + 查药店 + 推荐清淡外卖",
+    },
+    {
+        "type": "parents_miss",
+        "msg": "妈妈发消息说想你了，问你这周回不回家吃饭",
+        "urgency": "medium",
+        "domain": "general",
+        "hook": "如果周末有安排 → 提醒留时间回家",
+    },
+    {
+        "type": "boss_trip",
+        "msg": "老板说明天临时出差，让你今晚加班准备材料",
+        "urgency": "high",
+        "domain": "general",
+        "hook": "今晚有安排 → 冲突 + 推荐加班夜宵",
+    },
+
     # ═══ 天气相关生活事件 ═══
     {
         "type": "rain_surge",

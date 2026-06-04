@@ -356,6 +356,9 @@ function ask(msg) {
 // ── Sandbox Events Panel ──────────────────────────────
 
 const EVENT_DOT = {weather_changed:'w',forecast_change:'w',restaurant_full:'q',queue_update:'q',table_opened:'q',restaurant_closed:'v',restaurant_reopened:'v',venue_closed:'v',venue_disrupted:'v',venue_recovered:'v',ticket_released:'t',bikes_empty:'v',daily_special:'q',temporary_closed:'v',life_event:'l'};
+const EVENT_CAT = {life_work_deadline:'p',life_work_overtime:'p',life_girlfriend_sick:'p',life_parents_miss:'p',life_boss_trip:'p',life_social_birthday:'p',life_rain_surge:'p',life_heat_wave:'p',life_flash_table:'o',life_flash_discount:'o',life_ticket_released_vip:'o',life_last_chance:'o',ticket_released:'o',daily_special:'o',table_opened:'o',restaurant_reopened:'o'};
+const CAT_LABEL = {p:'个人',e:'环境',o:'机遇'};
+const CAT_COLOR = {p:'#f85149',e:'#d29922',o:'#3fb950'};
 
 function toggleSandbox() {
   document.getElementById('sandboxPanel').classList.toggle('collapsed');
@@ -380,10 +383,14 @@ function refreshSandbox() {
       for (var i = d.events.length - 1; i >= 0; i--) {
         var e = d.events[i];
         var dotClass = EVENT_DOT[e.type] || 'l';
+        var cat = EVENT_CAT[e.type] || 'e';
+        var catLabel = CAT_LABEL[cat] || '';
+        var catColor = CAT_COLOR[cat] || '#8b949e';
         var time = e.time_short || '';
         html += '<div class="sandbox-event">'
           + '<span class="se-time">' + time + '</span>'
           + '<span class="se-dot ' + dotClass + '"></span>'
+          + '<span style="font-size:9px;color:' + catColor + ';flex-shrink:0;min-width:20px">' + catLabel + '</span>'
           + '<span class="se-msg">' + e.message + '</span>'
           + '</div>';
       }
