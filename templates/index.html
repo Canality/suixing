@@ -17,7 +17,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 /* Chat Header */
 .chat-header{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:12px;z-index:2}
-.chat-avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#f97316);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.chat-avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#f97316);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;cursor:pointer;transition:transform .15s}.chat-avatar:hover{transform:scale(1.1)}
 .chat-header-info{flex:1}
 .chat-header-name{font-size:16px;font-weight:600}
 .chat-header-status{font-size:11px;opacity:.8;display:flex;align-items:center;gap:4px}
@@ -142,6 +142,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .sandbox-event .se-dot.l{background:#a371f7}
 .sandbox-event .se-msg{color:#8b949e;line-height:1.4;word-break:break-all}
 .sandbox-empty{color:#484f58;text-align:center;padding:20px 12px;font-size:11px}
+
+/* Settings Modal */
+.settings-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center}
+.settings-overlay.hidden{display:none}
+.settings-modal{background:#1a1a2e;border-radius:16px;padding:20px 24px;width:300px;box-shadow:0 16px 48px rgba(0,0,0,.6);color:#c9d1d9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px}
+.settings-modal h4{font-size:15px;margin-bottom:16px;color:#fff}
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #21262d}
+.settings-row:last-child{border-bottom:none}
+.settings-row .sr-label{display:flex;align-items:center;gap:6px}
+.settings-row .sr-desc{font-size:10px;color:#8b949e;margin-top:1px}
+.settings-toggle{width:40px;height:22px;border-radius:11px;background:#30363d;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0}
+.settings-toggle.on{background:#3fb950}
+.settings-toggle:after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s}
+.settings-toggle.on:after{left:20px}
+.settings-close{margin-top:14px;width:100%;padding:8px;background:#21262d;color:#c9d1d9;border:none;border-radius:8px;cursor:pointer;font-size:13px}
+.settings-close:hover{background:#30363d}
 </style>
 </head>
 <body>
@@ -166,12 +182,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="phone-notch"></div>
   <div class="phone-screen">
     <div class="chat-header">
-      <div class="chat-avatar">🦉</div>
+      <div class="chat-avatar" onclick="toggleSettings()" title="机遇提醒设置">🦉</div>
       <div class="chat-header-info">
         <div class="chat-header-name">随行 SuiXing</div>
         <div class="chat-header-status"><span class="dot"></span>在线 · 7x24</div>
       </div>
     </div>
+        <!-- Settings Modal -->
+    <div class="settings-overlay hidden" id="settingsOverlay" onclick="toggleSettings()">
+      <div class="settings-modal" onclick="event.stopPropagation()">
+        <h4>⚙ 机遇提醒设置</h4>
+        <div id="settingsRows"></div>
+        <button class="settings-close" onclick="toggleSettings()">关闭</button>
+      </div>
+    </div>
+
     <div class="watch-badge empty" id="watchBadge" style="display:none" onclick="toggleWatchDetail()">
       <span class="wdot"></span> <span id="watchBadgeText">无活跃监控</span>
     </div>
@@ -359,6 +384,39 @@ const EVENT_DOT = {weather_changed:'w',forecast_change:'w',restaurant_full:'q',q
 const EVENT_CAT = {life_work_deadline:'p',life_work_overtime:'p',life_girlfriend_sick:'p',life_parents_miss:'p',life_boss_trip:'p',life_social_birthday:'p',life_rain_surge:'p',life_heat_wave:'p',life_flash_table:'o',life_flash_discount:'o',life_ticket_released_vip:'o',life_last_chance:'o',ticket_released:'o',daily_special:'o',table_opened:'o',restaurant_reopened:'o'};
 const CAT_LABEL = {p:'个人',e:'环境',o:'机遇'};
 const CAT_COLOR = {p:'#f85149',e:'#d29922',o:'#3fb950'};
+
+let _oppConfig = {};
+
+function toggleSettings() {
+  var ov = document.getElementById('settingsOverlay');
+  if (ov.classList.contains('hidden')) {
+    fetch('/api/opportunity/config').then(function(r){return r.json()}).then(function(d){
+      _oppConfig = d.categories || {};
+      var rows = '';
+      for (var k in _oppConfig) {
+        var v = _oppConfig[k];
+        rows += '<div class="settings-row"><div><div class="sr-label">' + v.icon + ' ' + v.label + '</div></div><div class="settings-toggle' + (v.enabled ? ' on' : '') + '" onclick="toggleOpp('' + k + '',this)"></div></div>';
+      }
+      document.getElementById('settingsRows').innerHTML = rows;
+      ov.classList.remove('hidden');
+    });
+  } else {
+    ov.classList.add('hidden');
+  }
+}
+
+function toggleOpp(subcat, el) {
+  var enabled = !el.classList.contains('on');
+  fetch('/api/opportunity/toggle', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({category: subcat, enabled: enabled})
+  }).then(function(r){return r.json()}).then(function(d){
+    if (d.ok) {
+      if (enabled) el.classList.add('on'); else el.classList.remove('on');
+    }
+  });
+}
 
 function toggleSandbox() {
   document.getElementById('sandboxPanel').classList.toggle('collapsed');

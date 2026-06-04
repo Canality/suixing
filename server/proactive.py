@@ -16,6 +16,7 @@ import threading
 from datetime import datetime
 from server.llm import chat
 from server.memory import memory
+from server.opportunity_config import is_enabled
 from mock_backend.event_engine import get_recent_events
 
 
@@ -250,7 +251,7 @@ class ProactiveBrain:
                 if cat == "personal":
                     personal.append(e)
                 elif cat == "opportunity":
-                    if self._rarity_tracker.should_notify(e["type"], rarity):
+                    if is_enabled(e["type"]) and self._rarity_tracker.should_notify(e["type"], rarity):
                         opp.append(e)
                 else:
                     env.append(e)

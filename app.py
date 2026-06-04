@@ -21,6 +21,7 @@ from server.event_bus import bus
 from server.prompts import refresh_cache
 from server.watchdog import watchdog, start_watchdog_loop
 from server.proactive import brain, start_proactive_loop
+from server.opportunity_config import get_config, toggle as toggle_opp
 
 # ═══════════════════════════════════════════════════════════════
 # Mock Backend (内嵌)
@@ -377,6 +378,28 @@ def _get_proactive_context():
         return _get_context()
     except Exception:
         return ""
+
+
+# ═══════════════════════════════════════════════════════════════
+# 机遇事件开关 API
+# ═══════════════════════════════════════════════════════════════
+
+@app.get("/api/opportunity/config")
+def opp_config():
+    return {"ok": True, **get_config()}
+
+
+@app.post("/api/opportunity/toggle")
+async def opp_toggle(req: Request):
+    try:
+        body = await req.json()
+    except Exception:
+        return {"ok": False, "error": "invalid JSON"}
+    subcat = body.get("category", "")
+    enabled = body.get("enabled", True)
+    if toggle_opp(subcat, enabled):
+        return {"ok": True, "category": subcat, "enabled": enabled}
+    return {"ok": False, "error": f"Unknown category: {subcat}"}
 
 
 @app.get("/api/health")
