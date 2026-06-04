@@ -64,7 +64,9 @@ class Session:
             if not result.get("ok"):
                 await bus.emit_error(f"LLM调用失败: {result.get('error', '')}")
                 if round_num == 0:
-                    return self._fallback_reply(user_message)
+                    reply = self._fallback_reply(user_message)
+                    self._update_proactive_context(user_message, reply)
+                    return reply
                 break
 
             # 纯文本 → 这是最终回复
@@ -74,6 +76,7 @@ class Session:
                 await bus.emit_reply(reply)
                 self._trim()
                 self._log_memory(user_message, reply)
+                self._update_proactive_context(user_message, reply)
                 return reply
 
             # 工具调用 → 执行后继续循环
@@ -142,6 +145,7 @@ class Session:
         self._append("assistant", reply)
         await bus.emit_reply(reply)
         self._trim()
+        self._update_proactive_context(user_message, reply)
         return reply
 
     # ── Watchdog 触发 ──────────────────────────────────────────
@@ -169,6 +173,16 @@ class Session:
             memory.log_interaction(summary, [])
         except Exception:
             pass  # 日志失败不影响主流程
+
+    def _update_proactive_context(self, user_msg: str, reply: str):
+        """更新 ProactiveBrain 的对话上下文。"""
+        try:
+            from server.proactive import update_context
+            # 提取回复摘要（取第一句）
+            summary = reply.split("\n")[0][:120] if reply else ""
+            update_context(user_msg, summary)
+        except Exception:
+            pass
 
     def _append(self, role: str, content: str, tool_calls: list = None):
         msg: dict = {"role": role, "content": content}
