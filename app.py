@@ -351,7 +351,7 @@ def reset_sandbox():
     clear_events()
     brain._last_event_time = ""
     brain._last_notify_msg = ""
-    brain._notified_msgs.clear()
+    brain._notified_event_texts.clear()
     return {"ok": True, "message": "Sandbox events cleared"}
 
 

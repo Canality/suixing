@@ -114,12 +114,6 @@ def _get_context() -> str:
 
 # ── Prompt 构建 ──────────────────────────────────────────
 
-def _fmt_notified(msgs):
-    if not msgs:
-        return "(无)"
-    return "\n".join(f"- {m[:60]}" for m in list(msgs)[-5:])
-
-
 def _build_proactive_prompt(
     profile_text: str,
     personal_events: list,
@@ -127,7 +121,6 @@ def _build_proactive_prompt(
     opp_events: list,
     context: str,
     last_notify: str,
-    notified_msgs: set = None,
 ) -> str:
 
     def _fmt(events):
@@ -183,10 +176,6 @@ def _build_proactive_prompt(
 ## 上次已通知
 {last_notify if last_notify else "(无)"}
 
-## ⚠️ 已通知过的事件（不要再为这些事件重复通知）
-{_fmt_notified(notified_msgs) if notified_msgs else "(无)"}
-**重要: 已通知过的事件不要重复推送！除非事件状态发生了实质变化。**
-
 ## 回复格式（严格）
 - 不需要通知: SILENT
 - 需要通知: NOTIFY: <消息>
@@ -207,7 +196,7 @@ class ProactiveBrain:
         self._notification_callback = None
         self._check_count = 0
         self._last_notify_msg = ""
-        self._notified_msgs: set = set()  # 已通知过的事件消息文本
+        self._notified_event_texts: set = set()  # 已通知过的事件原文, 防重复
         self._rarity_tracker = RarityTracker()
 
     def set_callback(self, callback):
@@ -223,11 +212,11 @@ class ProactiveBrain:
             if not profile or "(尚无记录)" in profile:
                 return None
 
-            # 定期清理旧通知记录(每20次 ≈ 10分钟)
-            if self._check_count % 20 == 0 and self._check_count > 0:
-                self._notified_msgs.clear()
+            # 定期清理旧通知记录(每30次 ≈ 15分钟)
+            if self._check_count % 30 == 0 and self._check_count > 0:
+                self._notified_event_texts.clear()
 
-            # 2. 获取事件并按三级分类
+            # 2. 获取事件并按三级分类 + 源头去重
             events = get_recent_events(limit=80)
             if not events:
                 return None
@@ -239,6 +228,11 @@ class ProactiveBrain:
 
             personal, env, opp = [], [], []
             for e in events:
+                msg = e.get("message", "")
+                # 已通知过的事件不再重复喂给LLM
+                if msg in self._notified_event_texts:
+                    continue
+
                 cat, rarity = EVENT_CATEGORIES.get(e.get("type", ""), ("environmental", ""))
                 if cat == "personal":
                     personal.append(e)
@@ -259,7 +253,7 @@ class ProactiveBrain:
             # 4. 上下文 + LLM判断
             context = _get_context()
 
-            prompt = _build_proactive_prompt(profile, personal, env, opp, context, self._last_notify_msg, self._notified_msgs)
+            prompt = _build_proactive_prompt(profile, personal, env, opp, context, self._last_notify_msg)
             print(f"[ProactiveBrain] #{self._check_count} P:{len(personal)} E:{len(env)} O:{len(opp)} ctx:{len(context)}c", flush=True)
 
             result = chat(
@@ -284,11 +278,11 @@ class ProactiveBrain:
                 if " | " in msg:
                     msg = msg.split(" | ")[0].strip()
                 if msg:
-                    # 记录本次触发的事件消息(用于后续去重)
+                    # 记录本次触发的事件原文(源头去重: 这些事件不再喂给LLM)
                     for e in personal + env + opp:
-                        self._notified_msgs.add(e.get("message", "")[:60])
+                        self._notified_event_texts.add(e.get("message", ""))
                     self._last_notify_msg = msg
-                    print(f"[ProactiveBrain] → 推送 (已记录{len(self._notified_msgs)}条已通知事件)", flush=True)
+                    print(f"[ProactiveBrain] → 推送 (屏蔽{len(self._notified_event_texts)}条)", flush=True)
                     return msg
 
             return None
