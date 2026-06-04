@@ -17,7 +17,7 @@ from datetime import datetime
 from mock_backend.mock_data import (
     get_restaurant_state, get_weather_state,
     get_activity_state, get_bike_state, get_venue_state,
-    RESTAURANTS, WEATHER_CONDITIONS, BIKE_STATIONS,
+    RESTAURANTS, WEATHER_CONDITIONS, BIKE_STATIONS, ACTIVITIES,
 )
 from mock_backend.life_events import tick_life_events
 
@@ -154,7 +154,9 @@ def tick_activities():
         # 5%概率: sold_out → available (有人退票)
         elif s["status"] == "sold_out" and random.random() < 0.05:
             s["status"] = "available"
-            _add_event("ticket_released", aid, f"🎫 有人退票！活动ID {aid} 现在有票了")
+            act = next((a for a in ACTIVITIES if a["id"] == aid), None)
+            act_name = act["name"] if act else aid
+            _add_event("ticket_released", aid, f"🎫 有人退票！{act_name} 现在有票了")
         s["discount"] = random.choice([0, 0, 0, 0, 0, 10, 20])
 
 
