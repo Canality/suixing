@@ -31,7 +31,9 @@ HOST = os.environ.get("HOST", "0.0.0.0")
 PORT = int(os.environ.get("PORT", "8010"))
 
 # Mock API (self) — 始终用 127.0.0.1，因为子进程回调在同一容器内
+# 同时写入 os.environ，确保子进程脚本能读取到
 MOCK_API_URL = f"http://127.0.0.1:{PORT}"
+os.environ["MOCK_API_URL"] = MOCK_API_URL
 
 
 def load_workspace_file(filename: str) -> str:

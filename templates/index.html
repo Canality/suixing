@@ -150,9 +150,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <!-- Sandbox Events Panel -->
 <div class="sandbox-panel" id="sandboxPanel">
-  <div class="sandbox-header" onclick="toggleSandbox()">
-    <span class="sh-title">🎲 沙盒实时事件 <span class="sh-badge" id="sbCount">0</span></span>
-    <span class="sh-toggle">▼</span>
+  <div class="sandbox-header">
+    <span class="sh-title" onclick="toggleSandbox()" style="flex:1">🎲 沙盒实时事件 <span class="sh-badge" id="sbCount">0</span></span>
+    <button onclick="event.stopPropagation();fetch('/api/sandbox/reset').then(function(){refreshSandbox();})" title="清空事件" style="background:none;border:none;color:#484f58;cursor:pointer;font-size:12px;padding:2px 4px">✕</button>
+    <span class="sh-toggle" onclick="toggleSandbox()">▼</span>
   </div>
   <div class="sandbox-body" id="sandboxBody">
     <div class="sandbox-empty">等待事件...</div>
@@ -394,9 +395,6 @@ function refreshSandbox() {
 // Initial fetch + auto-refresh every 5 seconds
 refreshSandbox();
 setInterval(refreshSandbox, 5000);
-
-// Page refresh → clear sandbox events server-side
-fetch('/api/sandbox/reset');
 
 // SSE tech panel
 const evt = new EventSource('/api/events');
