@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: suixing
+    env: python
+    region: singapore
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: HOST
+        value: 0.0.0.0
