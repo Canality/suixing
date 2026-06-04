@@ -119,11 +119,46 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .action-card .ac-btn:hover{background:#6366f1;color:#fff}
 .action-card .ac-btn.primary{background:#6366f1;color:#fff}
 .action-card .ac-btn.primary:hover{background:#4f46e5}
+
+/* Sandbox Events Panel */
+.sandbox-panel{position:fixed;top:16px;left:16px;z-index:100;background:rgba(13,17,23,0.94);border:1px solid #21262d;border-radius:12px;width:280px;max-height:420px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.5);backdrop-filter:blur(8px);font-family:'SF Mono',Consolas,monospace;font-size:11px}
+.sandbox-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#161b22;border-bottom:1px solid #21262d;cursor:pointer;user-select:none}
+.sandbox-header .sh-title{font-size:12px;font-weight:600;color:#c9d1d9;display:flex;align-items:center;gap:6px}
+.sandbox-header .sh-badge{font-size:10px;padding:1px 6px;border-radius:8px;background:#23863622;color:#3fb950}
+.sandbox-header .sh-toggle{color:#484f58;transition:transform .2s;font-size:10px}
+.sandbox-panel.collapsed .sh-toggle{transform:rotate(-90deg)}
+.sandbox-panel.collapsed .sandbox-body{display:none}
+.sandbox-body{max-height:360px;overflow-y:auto;padding:4px 0}
+.sandbox-body::-webkit-scrollbar{width:3px}
+.sandbox-body::-webkit-scrollbar-thumb{background:#30363d;border-radius:2px}
+.sandbox-event{display:flex;gap:6px;padding:4px 10px;border-bottom:1px solid #ffffff05;animation:fadeTech .3s;align-items:flex-start}
+.sandbox-event:hover{background:#ffffff05}
+.sandbox-event .se-time{color:#484f58;font-size:10px;flex-shrink:0;min-width:36px;padding-top:1px}
+.sandbox-event .se-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.sandbox-event .se-dot.w{background:#58a6ff}
+.sandbox-event .se-dot.q{background:#d29922}
+.sandbox-event .se-dot.v{background:#f85149}
+.sandbox-event .se-dot.t{background:#3fb950}
+.sandbox-event .se-dot.l{background:#a371f7}
+.sandbox-event .se-msg{color:#8b949e;line-height:1.4;word-break:break-all}
+.sandbox-empty{color:#484f58;text-align:center;padding:20px 12px;font-size:11px}
 </style>
 </head>
 <body>
 <div class="stars"></div>
 <div class="toast-container" id="toastContainer"></div>
+
+<!-- Sandbox Events Panel -->
+<div class="sandbox-panel" id="sandboxPanel">
+  <div class="sandbox-header" onclick="toggleSandbox()">
+    <span class="sh-title">🎲 沙盒实时事件 <span class="sh-badge" id="sbCount">0</span></span>
+    <span class="sh-toggle">▼</span>
+  </div>
+  <div class="sandbox-body" id="sandboxBody">
+    <div class="sandbox-empty">等待事件...</div>
+  </div>
+</div>
+
 <div class="container">
 <!-- Phone -->
 <div class="phone-frame">
@@ -319,6 +354,49 @@ function ask(msg) {
     addSys('网络错误，请确认服务已启动');
   });
 }
+
+// ── Sandbox Events Panel ──────────────────────────────
+
+const EVENT_DOT = {weather_changed:'w',forecast_change:'w',restaurant_full:'q',queue_update:'q',table_opened:'q',restaurant_closed:'v',restaurant_reopened:'v',venue_closed:'v',venue_disrupted:'v',venue_recovered:'v',ticket_released:'t',bikes_empty:'v',daily_special:'q',temporary_closed:'v',life_event:'l'};
+
+function toggleSandbox() {
+  document.getElementById('sandboxPanel').classList.toggle('collapsed');
+}
+
+function refreshSandbox() {
+  fetch('/api/sandbox/events?limit=8')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var body = document.getElementById('sandboxBody');
+      var badge = document.getElementById('sbCount');
+      badge.textContent = d.count;
+      badge.style.background = d.count > 0 ? '#d2992233' : '#23863622';
+      badge.style.color = d.count > 0 ? '#d29922' : '#3fb950';
+
+      if (!d.events || !d.events.length) {
+        body.innerHTML = '<div class="sandbox-empty">等待事件...</div>';
+        return;
+      }
+
+      var html = '';
+      for (var i = d.events.length - 1; i >= 0; i--) {
+        var e = d.events[i];
+        var dotClass = EVENT_DOT[e.type] || 'l';
+        var time = e.time_short || '';
+        html += '<div class="sandbox-event">'
+          + '<span class="se-time">' + time + '</span>'
+          + '<span class="se-dot ' + dotClass + '"></span>'
+          + '<span class="se-msg">' + e.message + '</span>'
+          + '</div>';
+      }
+      body.innerHTML = html;
+    })
+    .catch(function() {});
+}
+
+// Initial fetch + auto-refresh every 5 seconds
+refreshSandbox();
+setInterval(refreshSandbox, 5000);
 
 // SSE tech panel
 const evt = new EventSource('/api/events');

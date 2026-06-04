@@ -320,6 +320,29 @@ def mock_random_events(limit: int = 10):
     return {"events": events, "timestamp": datetime.now().isoformat()}
 
 
+@app.get("/api/sandbox/events")
+def sandbox_events(limit: int = 8):
+    """返回最近的沙盒事件，供前端实时事件面板使用。"""
+    events = get_recent_events(limit)
+    # 格式化时间戳为短格式
+    for e in events:
+        if e.get("time"):
+            try:
+                t = e["time"]
+                if isinstance(t, str) and len(t) >= 16:
+                    e["time_short"] = t[11:16]  # HH:MM
+                else:
+                    e["time_short"] = ""
+            except Exception:
+                e["time_short"] = ""
+    return {
+        "events": events,
+        "count": len(events),
+        "timestamp": datetime.now().isoformat(),
+        "weather": get_weather_state().get("condition", ""),
+    }
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True, "service": "SuiXing Demo Server", "timestamp": datetime.now().isoformat()}
