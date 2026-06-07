@@ -4,7 +4,6 @@
 1. 读取 SOUL.md — 确认人设和红线
 2. 读取 USER.md — 了解服务对象
 3. 读取 memory/ 最新日志 — 回忆上次交互
-4. 读取 HEARTBEAT.md — 检查待执行的主动任务
 
 ## 工作流
 
@@ -35,16 +34,17 @@
 - 活动/电影: 猫眼、大麦
 - 路线: 高德地图、百度地图
 
-### 本地脚本(后台计算)
+### 本地脚本
 ```
 # Skill 1 — dining-advisor
 skills/dining-advisor/scripts/restaurant_search.py
 skills/dining-advisor/scripts/queue_monitor.py
 skills/dining-advisor/scripts/group_voting.py
-shared-scripts/booking_simulator.py
+skills/dining-advisor/scripts/multi_user_voting.py
 
 # Skill 2 — commute-planner
 skills/commute-planner/scripts/route_planner.py
+skills/commute-planner/scripts/route_link.py
 skills/commute-planner/scripts/ride_hailing.py
 skills/commute-planner/scripts/bike_routes.py
 
@@ -52,10 +52,6 @@ skills/commute-planner/scripts/bike_routes.py
 skills/leisure-scout/scripts/weather_fetcher.py
 skills/leisure-scout/scripts/activity_scraper.py
 skills/leisure-scout/scripts/upsell_engine.py
-
-# 共享
-shared-scripts/feishu_bot.py
-shared-scripts/heartbeat_runner.py
 ```
 
 ### Mock API(动态沙盒)
@@ -79,6 +75,6 @@ GET  http://localhost:8010/api/events/random     # 随机事件
 
 ## 记忆维护
 每轮对话结束时:
-1. 将用户新表达的口味偏好、常用路线、评价等追加到 MEMORY.md
+1. 将用户新表达的口味偏好、常用路线、评价等追加到 USER.md
 2. 在 memory/ 下创建或更新当日日志(YYYY-MM-DD.md)
 3. 记录关键决策: 用户选择了什么、拒绝了什么、下次要提醒什么

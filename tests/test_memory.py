@@ -1,5 +1,11 @@
 """MemoryManager 测试 — 用户画像读写、Layer2摘要、Layer3查询"""
 
+import io
+import sys
+
+# Fix Unicode output on Windows
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+
 import json
 from server.memory import memory, MemoryManager
 

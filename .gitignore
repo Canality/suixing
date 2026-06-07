@@ -14,3 +14,7 @@ __pycache__/
 Thumbs.db
 ngrok.exe
 ngrok.zip
+
+# Runtime
+openclaw-workspace/memory/*.md
+ngrok_output.txt

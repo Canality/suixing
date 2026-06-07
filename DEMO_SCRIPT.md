@@ -52,10 +52,10 @@
 ### 4:30-5:00 | 架构总结
 切换到代码视图:
 > "3个核心技术亮点:"
-> "1. OpenClaw原生工作区: SOUL.md + SKILL.md + HEARTBEAT.md"
+> "1. OpenClaw原生工作区: SOUL.md + AGENTS.md + 3个SKILL.md"
 > "2. DeepSeek Function Calling: 工具调用 → Mock API → 数据格式化 → 来源标注"
 > "3. 动态Mock沙盒: 12餐厅+8活动+随机事件引擎，非静态JSON"
-> "4. 131项自动化测试: Mock API 14 + Skill 41 + E2E 76"
+> "4. 153项自动化测试: Mock API 14 + Skill 41 + Memory 22 + E2E 76"
 
 ---
 

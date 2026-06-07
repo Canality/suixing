@@ -17,7 +17,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 /* Chat Header */
 .chat-header{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:12px;z-index:2}
-.chat-avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#f97316);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;cursor:pointer;transition:transform .15s}.chat-avatar:hover{transform:scale(1.1)}
+.chat-avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#f97316);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;cursor:pointer;transition:transform .15s;position:relative}.chat-avatar:hover{transform:scale(1.1)}.avatar-badge{position:absolute;bottom:-2px;right:-2px;width:16px;height:16px;border-radius:50%;background:#6366f1;border:2px solid #1a1a1a;font-size:9px;display:flex;align-items:center;justify-content:center;color:#fff}
 .chat-header-info{flex:1}
 .chat-header-name{font-size:16px;font-weight:600}
 .chat-header-status{font-size:11px;opacity:.8;display:flex;align-items:center;gap:4px}
@@ -182,7 +182,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="phone-notch"></div>
   <div class="phone-screen">
     <div class="chat-header">
-      <div class="chat-avatar" onclick="toggleSettings()" title="机遇提醒设置">🦉</div>
+      <div class="chat-avatar" onclick="toggleSettings()" title="点击配置推送偏好"><span class="avatar-badge">⚙</span>🦉</div>
       <div class="chat-header-info">
         <div class="chat-header-name">随行 SuiXing</div>
         <div class="chat-header-status"><span class="dot"></span>在线 · 7x24</div>
@@ -192,21 +192,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <span class="wdot"></span> <span id="watchBadgeText">无活跃监控</span>
     </div>
     <div class="quick-row" id="quickRow">
-      <button class="quick-btn" onclick="ask('我饿了，想吃川菜')">🍜 想吃川菜</button>
-      <button class="quick-btn" onclick="ask('我要去798艺术区，怎么走')">🚗 去798</button>
-      <button class="quick-btn" onclick="ask('周末有什么好玩的推荐')">🎬 周末活动</button>
-      <button class="quick-btn" onclick="ask('今天天气怎么样')">🌤️ 查天气</button>
-      <button class="quick-btn" onclick="ask('帮我推荐火锅，要排队少的')">🍲 火锅</button>
+      <button class="quick-btn" onclick="ask('想吃火锅，不想排队，帮我推荐排得少的')">🍲 火锅不排队</button>
+      <button class="quick-btn" onclick="ask('周末想去骑行，帮我看看天气和路线')">🚴 周末骑行</button>
+      <button class="quick-btn" onclick="ask('帮我安排今晚: 先吃饭再看电影')">🎬 今晚安排</button>
+      <button class="quick-btn" onclick="ask('从望京SOHO去798，帮我看看怎么走最快')">🚗 去798</button>
+      <button class="quick-btn" onclick="ask('帮我看看最近有什么好电影，不要太贵的')">🍿 找电影</button>
+      <button class="quick-btn" onclick="toggleSettings()" style="background:#f0f0ff;border-color:#6366f1;color:#6366f1">⚙ 推送设置</button>
     </div>
     <div class="chat-body" id="chatBody">
       <div class="msg agent">
-        你好！我是<strong>随行</strong> 🦉<br>
-        你的本地生活管家，7x24小时在线。<br><br>
-        我可以帮你：<br>
-        🍜 <strong>找餐厅</strong> · 搜索附近美食 · 取号排队<br>
-        🚗 <strong>规划出行</strong> · 路线导航 · 打车预估<br>
-        🎬 <strong>推荐活动</strong> · 查天气 · 周末好去处<br><br>
+        嗨，我是<strong>随行</strong> 🦉<br>
+        不是普通的 chatbot —— 我是你的 <strong>7×24 主动管家</strong>。<br><br>
+        💡 <strong>我能做的不一样:</strong><br>
+        · 一句话触发多源查询（天气 + 排队 + 路线一起查）<br>
+        · 后台持续监控，条件满足<strong>主动通知</strong>你<br>
+        · 记住你的偏好，越用越懂你<br>
+        · 每个推荐都标注真实来源 [美团] [高德] [猫眼]<br><br>
         试试下面的快捷按钮 👇<br>
+        点击左上角 <strong>🦉 头像</strong> 可配置推送偏好<br>
         <span class="src-tag">随行 Demo v2.0</span>
       </div>
     </div>
