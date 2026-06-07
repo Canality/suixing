@@ -8,30 +8,28 @@
 
 ## Demo 访问
 
-### 方式一: ngrok 公网隧道 (推荐，最简单)
+本地一键启动:
 
 ```bash
-# 终端1: 启动服务
-python app.py
-
-# 终端2: 启动公网隧道 → 获取 https://xxxx.ngrok-free.app 地址
-ngrok http 8010
+pip install -r requirements.txt
+cp .env.example .env   # 填入 DeepSeek API Key
+python app.py          # → http://localhost:8010
 ```
 
-> 或一键启动: `.\start_public.ps1` (PowerShell)
-
-### 方式二: Docker 部署
+公网隧道 (让评委远程访问):
 
 ```bash
-docker build -t suixing .
-docker run -p 8010:8010 -e DEEPSEEK_API_KEY=sk-your-key suixing
+# 终端2
+ngrok http 8010        # → https://xxxx.ngrok-free.app
 ```
+
+> 或一键: `.\start_public.ps1` (PowerShell)
 
 | 入口 | 地址 |
 |------|------|
 | Web UI | `http://<host>:8010` |
-| API 健康检查 | `http://<host>:8010/api/health` |
-| SSE 技术面板 | `http://<host>:8010/api/events` |
+| 健康检查 | `http://<host>:8010/api/health` |
+| SSE 面板 | `http://<host>:8010/api/events` |
 
 ---
 
@@ -330,7 +328,7 @@ meituan-travel-assistant/
 └── tests/                        # 153 项测试
     ├── test_mock_backend.py      # Mock API 测试 (14 项)
     ├── test_skills.py            # Skill 脚本测试 (41 项)
-    ├── test_memory.py            # 用户记忆测试 (25 项)
+    ├── test_memory.py            # 用户记忆测试 (22 项)
     └── test_e2e.py               # 端到端测试 (76 项)
 ```
 
